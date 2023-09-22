@@ -5,7 +5,7 @@ import webcolors
 from django.core.files.base import ContentFile
 from rest_framework import serializers
 
-from .models import User, Tag, Ingridient, Recipe
+from foodgram_backend.models import User, Tag, Ingridient, Recipe
 
 
 class Hex2NameColor(serializers.Field):

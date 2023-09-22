@@ -17,16 +17,6 @@ class User(AbstractUser):
         unique=True,
         validators=(validate_username,)
     )
-    first_name = models.CharField(
-        'Имя',
-        max_length=150,
-        blank=True
-    )
-    last_name = models.CharField(
-        'Фамилия',
-        max_length=150,
-        blank=True
-    )
     password = models.CharField(
         'Пароль',
         max_length=150,

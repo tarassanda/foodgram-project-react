@@ -13,6 +13,10 @@ def validate_year(year):
 
 
 def validate_username(username):
+    if username == 'me':
+        raise ValidationError(
+            ('Имя пользователя не может быть <me>.'),
+        )
     if re.search(r'^[a-zA-Z][a-zA-Z0-9-_.]{1,150}$', username) is None:
         raise ValidationError(
             (f'Не допустимые символы <{username}> в нике.'),
