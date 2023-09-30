@@ -3,6 +3,7 @@ version: '3.10.12'
 volumes:
   media:
   static:
+  foodgram_db:
 
 services:
   db:
@@ -12,14 +13,14 @@ services:
       - POSTGRES_USER=foodgram_user
     image: postgres:13
     volumes:
-      - /home/foodgram-db/postgresql/data/:/var/lib/postgresql/data
+      - foodgram_db:/var/lib/postgresql/data
   backend:
     depends_on:
       - db
     build: ../backend/foodgram/
     env_file: .env
     volumes:    
-      - static:/backend_static
+      - /home/static:/app/collected_static/
       - media:/media/
   frontend:
     build:
@@ -28,6 +29,8 @@ services:
     volumes:
       - ../frontend/:/app/result_build/
   nginx:
+    depends_on:
+      - backend
     image: nginx:1.22.1
     env_file: .env
     ports:
@@ -37,4 +40,4 @@ services:
       - ../frontend/build:/usr/share/nginx/html/
       - ../docs/:/usr/share/nginx/html/api/docs/
       - media:/media/
-      - static:/static
+      - /home/static:/static/

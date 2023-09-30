@@ -40,9 +40,9 @@ class Tag(models.Model):
         return self.name
 
 
-class Ingridient(models.Model):
-    """Модель для Ingridients"""
-    name = models.CharField(max_length=200, verbose_name='Ингридиент')
+class Ingredient(models.Model):
+    """Модель для Ingredients"""
+    name = models.CharField(max_length=200, verbose_name='Ингредиент')
     measurement_unit = models.CharField(max_length=200, null=False)
 
     def __str__(self):
@@ -56,9 +56,9 @@ class Recipe(models.Model):
         verbose_name='Описание',
         help_text='Опишите, о чём произведение.'
     )
-    ingridients = models.ManyToManyField(
-        'Ingridient',
-        related_name='ingridients',
+    ingredients = models.ManyToManyField(
+        'Ingredient',
+        related_name='ingredients',
         verbose_name='Ингридиенты'
     )
     tags = models.ManyToManyField(

@@ -5,21 +5,13 @@ import webcolors
 from django.core.files.base import ContentFile
 from rest_framework import serializers
 
-from foodgram_backend.models import User, Tag, Ingridient, Recipe
+from foodgram_backend.models import User, Tag, Ingredient, Recipe
 
+from foodgram_backend.validators import validate_username
 
-class Hex2NameColor(serializers.Field):
-    def to_representation(self, value):
-        return value
-
-    def to_internal_value(self, data):
-        try:
-            data = webcolors.hex_to_name(data)
-        except ValueError:
-            raise serializers.ValidationError('Для этого цвета нет имени')
-        return data
 
 class Base64ImageField(serializers.ImageField):
+
     def to_internal_value(self, data):
         if isinstance(data, str) and data.startswith('data:image'):
             format, imgstr = data.split(';base64,')
@@ -30,25 +22,41 @@ class Base64ImageField(serializers.ImageField):
         return super().to_internal_value(data)
 
 
-
 class UserSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = User
         fields = ['email', 'username', 'first_name',
                   'last_name', 'password']
 
 
+class UserRegistrationSerializer(serializers.Serializer):
+
+    username = serializers.CharField(
+        max_length=150,
+        validators=[validate_username]
+    )
+    email = serializers.EmailField(max_length=254)
+
+
+class CustomTokenSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = User
+        fields = ['email', 'password']
+
+
 class TagSerializer(serializers.ModelSerializer):
-    color = Hex2NameColor()
 
     class Meta:
         model = Tag
         fields = ['name', 'color', 'slug']
 
 
-class IngridientSerializer(serializers.ModelSerializer):
+class IngredientSerializer(serializers.ModelSerializer):
+
     class Meta:
-        model = Ingridient
+        model = Ingredient
         fields = ['name', 'measurement_unit']
 
 
@@ -57,5 +65,5 @@ class RecipeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Recipe
-        fields = ['ingridients', 'tags', 'image',
+        fields = ['ingredients', 'tags', 'image',
                   'name', 'text', 'cooking_time']
