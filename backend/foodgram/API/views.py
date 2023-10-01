@@ -16,8 +16,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from foodgram_backend.models import (User, Tag, Recipe, Ingredient)
-from .serializers import (TagSerializer, RecipeSerializer,
-                          IngredientSerializer, UserSerializer, UserRegistrationSerializer,
+from .serializers import (TagSerializer, RecipeSerializer, UserSerializer,
+                          IngredientSerializer, UserRegistrationSerializer,
                           CustomTokenSerializer)
 
 
@@ -118,19 +118,29 @@ class GetUserToken(APIView):
                         status=status.HTTP_200_OK)
 
 
-class TagViewSet(viewsets.ModelViewSet):
+class TagViewSet(mixins.ListModelMixin,
+                 mixins.CreateModelMixin,
+                 mixins.RetrieveModelMixin,
+                 viewsets.GenericViewSet):
     """ViewSet для работы с тегами."""
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
+    pagination_class = None
 
 
-class IngredientViewSet(viewsets.ModelViewSet):
+class IngredientViewSet(mixins.ListModelMixin,
+                        mixins.RetrieveModelMixin,
+                        viewsets.GenericViewSet):
     """ViewSet для работы с ингридиентами."""
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
+    pagination_class = None
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
     """ViewSet для работы с рецептами."""
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)

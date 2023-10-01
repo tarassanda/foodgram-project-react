@@ -5,7 +5,7 @@ import webcolors
 from django.core.files.base import ContentFile
 from rest_framework import serializers
 
-from foodgram_backend.models import User, Tag, Ingredient, Recipe
+from foodgram_backend.models import User, Tag, Ingredient, Recipe, IngredientAmount
 
 from foodgram_backend.validators import validate_username
 
@@ -50,7 +50,7 @@ class TagSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Tag
-        fields = ['name', 'color', 'slug']
+        fields = ['id', 'name', 'color', 'slug']
 
 
 class IngredientSerializer(serializers.ModelSerializer):
@@ -60,10 +60,23 @@ class IngredientSerializer(serializers.ModelSerializer):
         fields = ['name', 'measurement_unit']
 
 
+class IngredientAmountSerializer(serializers.ModelSerializer):
+    id = serializers.ReadOnlyField(source='ingredient.id')
+
+    class Meta:
+        model = IngredientAmount
+        fields = ('id', 'amount')
+
+
 class RecipeSerializer(serializers.ModelSerializer):
+    ingredients = IngredientAmountSerializer(many=True,
+                                             source='ingredientamount_set')
+    tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(),
+                                              many=True)
     image = Base64ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Recipe
         fields = ['ingredients', 'tags', 'image',
                   'name', 'text', 'cooking_time']
+        read_only_fields = ['author']

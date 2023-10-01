@@ -22,7 +22,7 @@ class User(AbstractUser):
         max_length=150,
         blank=True
     )
-    
+
     class Meta:
         ordering = ('username',)
 
@@ -79,6 +79,62 @@ class Recipe(models.Model):
     )
     cooking_time = models.PositiveSmallIntegerField(
         verbose_name='Время приготовления (минут)')
-    
+
     def __str__(self):
         return self.name
+
+
+class IngredientAmount(models.Model):
+    ingredient = models.ForeignKey(
+        Ingredient,
+        on_delete=models.CASCADE,
+        verbose_name='Ингредиент')
+    amount = models.PositiveIntegerField()
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        verbose_name='Рецепт')
+
+
+class FavoriteRecipe(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='favorite_follower',
+        verbose_name='Подписчик'
+    )
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        related_name='favorite_recipe',
+        verbose_name='Рецепт'
+    )
+
+
+class Follow (models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='follow_follower',
+        verbose_name='Подписчик'
+    )
+    following = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='follow_author',
+        verbose_name='Автор'
+    )
+
+    class Meta:
+        verbose_name = 'Подписка'
+
+        constraints = [
+            models.UniqueConstraint(
+                name='Unique_follow',
+                fields=['following', 'user']
+            ),
+            models.CheckConstraint(
+                check=~models.Q(following=models.F('user')),
+                name='user_cannot_follow_themselves'
+            )
+        ]

@@ -2,6 +2,8 @@ import csv
 from django.core.management.base import BaseCommand
 from foodgram_backend.models import Ingredient
 
+# docker compose exec backend python manage.py ingredient_import backend/foodgram/data/ingredients.csv
+
 
 class Command(BaseCommand):
     help = 'Загрузка данных из CSV файла в базу данных Django'
