@@ -5,9 +5,9 @@ import webcolors
 from django.core.files.base import ContentFile
 from rest_framework import serializers
 
-from foodgram_backend.models import User, Tag, Ingredient, Recipe, IngredientAmount
-
-from foodgram_backend.validators import validate_username
+from foodgram_backend.models import (User, Tag, Ingredient,
+                                     Recipe, IngredientAmount,
+                                     Follow)
 
 
 class Base64ImageField(serializers.ImageField):
@@ -22,21 +22,32 @@ class Base64ImageField(serializers.ImageField):
         return super().to_internal_value(data)
 
 
-class UserSerializer(serializers.ModelSerializer):
+class UserCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['email', 'username', 'first_name',
+        fields = ['email', 'id', 'username', 'first_name',
                   'last_name', 'password']
 
 
-class UserRegistrationSerializer(serializers.Serializer):
+class UserGetSerializer(serializers.ModelSerializer):
+    is_subscribed = serializers.SerializerMethodField(read_only=True)
 
-    username = serializers.CharField(
-        max_length=150,
-        validators=[validate_username]
-    )
-    email = serializers.EmailField(max_length=254)
+    class Meta:
+        model = User
+        fields = ['email', 'id', 'username', 'first_name',
+                  'last_name', 'password', 'is_subscribed']
+
+    def get_is_subscribed(self, obj):
+        user = self.context.get('request').user
+        if user.is_anonymous:
+            return False
+        return Follow.objects.filter(user=user, following=obj).exists()
+
+
+class SetPasswordSerializer(serializers.Serializer):
+    new_password = serializers.CharField(required=True)
+    current_password = serializers.CharField(required=True)
 
 
 class CustomTokenSerializer(serializers.ModelSerializer):
@@ -44,6 +55,12 @@ class CustomTokenSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['email', 'password']
+
+
+class FollowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Follow
+        fields = ['user', 'following']
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -65,14 +82,41 @@ class IngredientAmountSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IngredientAmount
-        fields = ('id', 'amount')
+        fields = ['id', 'amount']
+
+
+class RecipePostSerializer(serializers.ModelSerializer):
+    ingredients = IngredientAmountSerializer(many=True)
+    tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(),
+                                              many=True)
+    image = Base64ImageField(required=False, allow_null=True)
+
+    class Meta:
+        model = Recipe
+        fields = ['ingredients', 'tags', 'image',
+                  'name', 'text', 'cooking_time']
+        read_only_fields = ['author']
+
+    def create(self, validated_data):
+        ingredients = validated_data.pop('ingredients')
+        tags = validated_data.pop('tags')
+        recipe = Recipe.objects.create(**validated_data)
+        recipe.tags.set(tags)
+        for ingredient in ingredients:
+            IngredientAmount.objects.create(
+                ingredient=ingredient.get('ingredient_id'),
+                amount=ingredient.get('amount'),
+                recipe=recipe,)
+        return recipe
+
+    def to_representation(self, instance):
+        request = self.context.get('request')
+        context = {'request': request}
+        return RecipeSerializer(instance, context=context).data
 
 
 class RecipeSerializer(serializers.ModelSerializer):
-    ingredients = IngredientAmountSerializer(many=True,
-                                             source='ingredientamount_set')
-    tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(),
-                                              many=True)
+
     image = Base64ImageField(required=False, allow_null=True)
 
     class Meta:

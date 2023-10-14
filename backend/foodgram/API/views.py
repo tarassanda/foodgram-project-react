@@ -1,8 +1,6 @@
-from django.core.mail import send_mail
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth import authenticate
 from django.db.models import Avg
-from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, permissions, viewsets, status
@@ -13,15 +11,16 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated
 
-from foodgram_backend.models import (User, Tag, Recipe, Ingredient)
-from .serializers import (TagSerializer, RecipeSerializer, UserSerializer,
-                          IngredientSerializer, UserRegistrationSerializer,
-                          CustomTokenSerializer)
-
-
-FROM_WHO_EMAIL_ADDRESS = 'api_yamdb@kogorta.com'
+from foodgram_backend.models import (User, Tag, Recipe, Ingredient, Follow)
+from .serializers import (TagSerializer, RecipePostSerializer,
+                          UserGetSerializer, UserCreateSerializer,
+                          IngredientSerializer, SetPasswordSerializer,
+                          RecipeSerializer, FollowSerializer)
 
 
 class CreateListDestroyViewSet(mixins.CreateModelMixin,
@@ -33,14 +32,16 @@ class CreateListDestroyViewSet(mixins.CreateModelMixin,
     lookup_field = 'slug'
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(mixins.CreateModelMixin,
+                  mixins.ListModelMixin,
+                  mixins.RetrieveModelMixin,
+                  viewsets.GenericViewSet):
     queryset = User.objects.all()
-    serializer_class = UserSerializer
-    filter_backends = (SearchFilter,)
-    search_fields = ('username',)
-    lookup_field = 'username'
-    http_method_names = ['get', 'post', 'head', 'patch', 'delete']
-    permission_classes = [permissions.AllowAny]
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return UserGetSerializer
+        return UserCreateSerializer
 
     @action(
         methods=['GET'],
@@ -49,47 +50,66 @@ class UserViewSet(viewsets.ModelViewSet):
         url_path='me')
     def get_me_data(self, request):
         """Позволяет пользователю получить информацию о своём профиле."""
-        serializer = UserSerializer(request.user)
+        serializer = UserGetSerializer(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-
-class UserRegistrationView(APIView):
-    """View-класс для создания пользователя."""
-    permission_classes = [permissions.AllowAny]
-
-    def send_confirmation_code(self, user, username, user_email):
-        """Генерирует confirmation_code и отсылает пользователю."""
-        code = default_token_generator.make_token(user)
-        send_mail(
-            f'Confirmation code for {username}',
-            f'Ваш код подтверждения: {code}',
-            FROM_WHO_EMAIL_ADDRESS,
-            [user_email]
+    @action(
+        queryset=Follow.objects.all(),
+        methods=['post'],
+        detail=True,
+        permission_classes=[permissions.IsAuthenticated]
         )
+    def subscribe(self, request, pk=None):
+        user_to_follow = get_object_or_404(User, id=pk)
+        user = self.request.user
+        if user != user_to_follow and not Follow.objects.filter(user=user, following=user_to_follow).exists():
+            Follow.objects.create(user=user, following=user_to_follow)
+            return Response({'message': 'Successfully subscribed to user.'})
+        return Response({'message': 'Unable to subscribe to the user.'}, status=400)
 
-    def post(self, request):
-        serializer = UserRegistrationSerializer(data=request.data)
+    @action(
+        queryset=Follow.objects.all(),
+        methods=['delete'],
+        detail=True,
+        permission_classes=[permissions.IsAuthenticated])
+    def unsubscribe(self, request, pk=None):
+        user_to_unfollow = get_object_or_404(User, id=pk)
+        user = self.request.user
+        if Follow.objects.filter(user=user,
+                                 following=user_to_unfollow).exists():
+            follow_instance = Follow.objects.get(user=user,
+                                                 following=user_to_unfollow)
+            follow_instance.delete()
+            return Response({'message':
+                             'Successfully unsubscribed from the user.'})
+        return Response({'message': 'Not subscribed to the user.'}, status=400)
+
+    @action(
+        methods=['POST'],
+        detail=False,
+        url_path='set_password',
+        permission_classes=[permissions.IsAuthenticated],
+        serializer_class=SetPasswordSerializer)
+    def set_password(self, request):
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        username = serializer.validated_data['username']
-        user_email = serializer.validated_data['email']
 
-        try:
-            user, _ = User.objects.get_or_create(
-                username=username,
-                email=user_email
-            )
+        user = self.request.user
+        current_password = serializer.validated_data.get('current_password')
+        new_password = serializer.validated_data.get('new_password')
 
-        except IntegrityError:
-            raise ValidationError(
-                'Пользователь с таким username или \
-email уже существует.')
+        if current_password != user.password:
+            return Response({'message': 'Invalid current password.'},
+                            status=400)
 
-        self.send_confirmation_code(user, username, user_email)
-        return Response(serializer.validated_data)
+        user.password = new_password
+        user.save(update_fields=['password'])
+
+        return Response({'message': 'Password successfully changed.'},
+                        status=200)
 
 
-class GetUserToken(APIView):
-    """View-класс для получения JWT-access-токена."""
+class TokenLoginViewSet(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -118,6 +138,22 @@ class GetUserToken(APIView):
                         status=status.HTTP_200_OK)
 
 
+class TokenLogoutViewSet(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+
+        try:
+            token = RefreshToken.for_user(user)
+            token.blacklist()
+            return Response({'message': 'Successfully logged out.'},
+                            status=status.HTTP_204_NO_CONTENT)
+        except Exception:
+            return Response({'error': 'Invalid token.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+
 class TagViewSet(mixins.ListModelMixin,
                  mixins.CreateModelMixin,
                  mixins.RetrieveModelMixin,
@@ -140,7 +176,11 @@ class IngredientViewSet(mixins.ListModelMixin,
 class RecipeViewSet(viewsets.ModelViewSet):
     """ViewSet для работы с рецептами."""
     queryset = Recipe.objects.all()
-    serializer_class = RecipeSerializer
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return RecipeSerializer
+        return RecipePostSerializer
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)

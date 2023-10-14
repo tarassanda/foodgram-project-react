@@ -14,3 +14,7 @@ class RecipeAdmin(admin.ModelAdmin):
 @admin.register(Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
     pass
+
+@admin.register(User)
+class UserAdmin(admin.ModelAdmin):
+    pass

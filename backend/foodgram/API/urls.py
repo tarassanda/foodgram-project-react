@@ -1,8 +1,9 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import (TagViewSet, GetUserToken, IngredientViewSet,
-                    UserRegistrationView, UserViewSet, RecipeViewSet)
+from .views import (TagViewSet, TokenLoginViewSet, TokenLogoutViewSet,
+                    IngredientViewSet,
+                    UserViewSet, RecipeViewSet)
 
 router_v1 = DefaultRouter()
 router_v1.register('tags', TagViewSet, basename='tags')
@@ -12,8 +13,9 @@ router_v1.register('recipes', RecipeViewSet, basename='tags')
 
 
 auth_urls = [
-    path('signup/', UserRegistrationView.as_view(), name='signup'),
-    path('token/login/', GetUserToken.as_view(), name='token'),
+    path('token/login/', TokenLoginViewSet.as_view(), name='login'),
+    path('token/logout/', TokenLogoutViewSet.as_view(), name='logout'),
+
 
 ]
 
