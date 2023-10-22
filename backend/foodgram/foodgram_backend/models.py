@@ -111,7 +111,7 @@ class FavoriteRecipe(models.Model):
     )
 
 
-class Follow (models.Model):
+class Follow(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -138,3 +138,18 @@ class Follow (models.Model):
                 name='user_cannot_follow_themselves'
             )
         ]
+
+
+class ShoppingCart(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='shopping_user',
+        verbose_name='Пользователь',
+    )
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        related_name='shopping_recipe',
+        verbose_name='Рецепт',
+    )

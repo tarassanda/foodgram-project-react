@@ -16,11 +16,14 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.permissions import IsAuthenticated
 
-from foodgram_backend.models import (User, Tag, Recipe, Ingredient, Follow)
+from foodgram_backend.models import (User, Tag, Recipe, Ingredient,
+                                     Follow, FavoriteRecipe)
 from .serializers import (TagSerializer, RecipePostSerializer,
                           UserGetSerializer, UserCreateSerializer,
                           IngredientSerializer, SetPasswordSerializer,
-                          RecipeSerializer, FollowSerializer)
+                          RecipeSerializer, FollowSerializer,
+                          RecipeFollowSerializer)
+from .filters import IngredientFilter
 
 
 class CreateListDestroyViewSet(mixins.CreateModelMixin,
@@ -54,37 +57,6 @@ class UserViewSet(mixins.CreateModelMixin,
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(
-        queryset=Follow.objects.all(),
-        methods=['post'],
-        detail=True,
-        permission_classes=[permissions.IsAuthenticated]
-        )
-    def subscribe(self, request, pk=None):
-        user_to_follow = get_object_or_404(User, id=pk)
-        user = self.request.user
-        if user != user_to_follow and not Follow.objects.filter(user=user, following=user_to_follow).exists():
-            Follow.objects.create(user=user, following=user_to_follow)
-            return Response({'message': 'Successfully subscribed to user.'})
-        return Response({'message': 'Unable to subscribe to the user.'}, status=400)
-
-    @action(
-        queryset=Follow.objects.all(),
-        methods=['delete'],
-        detail=True,
-        permission_classes=[permissions.IsAuthenticated])
-    def unsubscribe(self, request, pk=None):
-        user_to_unfollow = get_object_or_404(User, id=pk)
-        user = self.request.user
-        if Follow.objects.filter(user=user,
-                                 following=user_to_unfollow).exists():
-            follow_instance = Follow.objects.get(user=user,
-                                                 following=user_to_unfollow)
-            follow_instance.delete()
-            return Response({'message':
-                             'Successfully unsubscribed from the user.'})
-        return Response({'message': 'Not subscribed to the user.'}, status=400)
-
-    @action(
         methods=['POST'],
         detail=False,
         url_path='set_password',
@@ -107,6 +79,46 @@ class UserViewSet(mixins.CreateModelMixin,
 
         return Response({'message': 'Password successfully changed.'},
                         status=200)
+
+    @action(
+        methods=['post', 'delete'],
+        detail=True,
+        permission_classes=[permissions.IsAuthenticated])
+    def subscribe(self, request, pk=None):
+        user = self.request.user
+        author = get_object_or_404(User, id=pk)
+
+        if request.method == 'POST':
+            recipes_limit = request.query_params.get('recipes_limit')
+            serializer = FollowSerializer(
+                author, context={"request": request, "recipes_limit": recipes_limit})
+            if user != author and not Follow.objects.filter(user=user, following=author).exists():
+                Follow.objects.create(user=user, following=author)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response({'message': 'Unable to subscribe to the user.'}, status=400)
+
+        if request.method == 'DELETE':
+            if Follow.objects.filter(user=user,
+                                     following=author).exists():
+                follow_instance = Follow.objects.get(user=user,
+                                                     following=author)
+                follow_instance.delete()
+                return Response({'message':
+                                 'Successfully unsubscribed from the user.'})
+            return Response({'message': 'Not subscribed to the user.'}, status=400)
+
+    @action(
+        detail=False,
+        permission_classes=[IsAuthenticated]
+    )
+    def subscriptions(self, request):
+        user = request.user
+        queryset = User.objects.filter(subscribing__user=user)
+        pages = self.paginate_queryset(queryset)
+        serializer = FollowSerializer(pages,
+                                      many=True,
+                                      context={'request': request})
+        return self.get_paginated_response(serializer.data)
 
 
 class TokenLoginViewSet(APIView):
@@ -170,6 +182,8 @@ class IngredientViewSet(mixins.ListModelMixin,
     """ViewSet для работы с ингридиентами."""
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = IngredientFilter
     pagination_class = None
 
 
@@ -184,3 +198,74 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+    @action(
+        methods=['post', 'delete'],
+        detail=True,
+        queryset=FavoriteRecipe.objects.all(),
+        permission_classes=[permissions.IsAuthenticated])
+    def favorite(self, request, pk=None):
+        user = self.request.user
+        recipe = get_object_or_404(Recipe, id=pk)
+
+        if request.method == 'POST':
+            serializer = RecipeFollowSerializer(recipe)
+            if not FavoriteRecipe.objects.filter(user=user,
+                                                 recipe=recipe).exists():
+                FavoriteRecipe.objects.create(user=user, recipe=recipe)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response({'message': 'Unable to add recipe to favorite.'}, status=400)
+
+        if request.method == 'DELETE':
+            if FavoriteRecipe.objects.filter(user=user,
+                                             recipe=recipe).exists():
+                follow_instance = FavoriteRecipe.objects.get(user=user,
+                                                             recipe=recipe)
+                follow_instance.delete()
+                return Response({'message':
+                                 'Successfully deleted recipe from favorite.'})
+            return Response({'message': 'Recipe not in favorite.'}, status=400)
+
+
+
+
+
+
+
+
+# class SubscribeSerializer(CustomUserSerializer):
+#     recipes_count = SerializerMethodField()
+#     recipes = SerializerMethodField()
+
+#     class Meta(CustomUserSerializer.Meta):
+#         fields = CustomUserSerializer.Meta.fields + (
+#             'recipes_count', 'recipes'
+#         )
+#         read_only_fields = ('email', 'username')
+
+#     def validate(self, data):
+#         author = self.instance
+#         user = self.context.get('request').user
+#         if Subscribe.objects.filter(author=author, user=user).exists():
+#             raise ValidationError(
+#                 detail='Вы уже подписаны на этого пользователя!',
+#                 code=status.HTTP_400_BAD_REQUEST
+#             )
+#         if user == author:
+#             raise ValidationError(
+#                 detail='Вы не можете подписаться на самого себя!',
+#                 code=status.HTTP_400_BAD_REQUEST
+#             )
+#         return data
+
+#     def get_recipes_count(self, obj):
+#         return obj.recipes.count()
+
+#     def get_recipes(self, obj):
+#         request = self.context.get('request')
+#         limit = request.GET.get('recipes_limit')
+#         recipes = obj.recipes.all()
+#         if limit:
+#             recipes = recipes[:int(limit)]
+#         serializer = RecipeShortSerializer(recipes, many=True, read_only=True)
+#         return serializer.data
