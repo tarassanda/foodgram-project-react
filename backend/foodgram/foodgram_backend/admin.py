@@ -5,6 +5,11 @@ from .models import (User, Tag, Recipe, Ingredient,
                      Follow, ShoppingCart)
 
 
+class IngredientAmountInline(admin.TabularInline):
+    model = IngredientAmount
+    extra = 1
+
+
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
     pass
@@ -12,7 +17,7 @@ class TagAdmin(admin.ModelAdmin):
 
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    pass
+    inlines = (IngredientAmountInline,)
 
 
 @admin.register(Ingredient)

@@ -17,10 +17,20 @@ class User(AbstractUser):
         unique=True,
         validators=(validate_username,)
     )
+    first_name = models.CharField(
+        'Имя',
+        max_length=150,
+        blank=False
+    )
+    last_name = models.CharField(
+        'Фамилия',
+        max_length=150,
+        blank=False
+    )
     password = models.CharField(
         'Пароль',
         max_length=150,
-        blank=True
+        blank=False
     )
 
     class Meta:
@@ -58,6 +68,8 @@ class Recipe(models.Model):
     )
     ingredients = models.ManyToManyField(
         'Ingredient',
+        through='IngredientAmount',
+        through_fields=('recipe', 'ingredient'),
         related_name='ingredients',
         verbose_name='Ингридиенты'
     )
@@ -100,13 +112,13 @@ class FavoriteRecipe(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='favorite_follower',
+        related_name='favorites',
         verbose_name='Подписчик'
     )
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
-        related_name='favorite_recipe',
+        related_name='favorites',
         verbose_name='Рецепт'
     )
 
@@ -126,8 +138,6 @@ class Follow(models.Model):
     )
 
     class Meta:
-        verbose_name = 'Подписка'
-
         constraints = [
             models.UniqueConstraint(
                 name='Unique_follow',
@@ -144,12 +154,12 @@ class ShoppingCart(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='shopping_user',
+        related_name='shopping_cart',
         verbose_name='Пользователь',
     )
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
-        related_name='shopping_recipe',
+        related_name='shopping_cart',
         verbose_name='Рецепт',
     )

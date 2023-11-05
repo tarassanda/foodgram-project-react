@@ -19,5 +19,5 @@ def validate_username(username):
         )
     if re.search(r'^[a-zA-Z][a-zA-Z0-9-_.]{1,150}$', username) is None:
         raise ValidationError(
-            (f'Не допустимые символы <{username}> в нике.'),
+            (f'Недопустимые символы <{username}> в нике.'),
         )
