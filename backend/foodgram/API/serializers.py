@@ -2,12 +2,11 @@ import base64
 
 from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
-from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
-
 from foodgram_backend.models import (FavoriteRecipe, Follow, Ingredient,
                                      IngredientAmount, Recipe, ShoppingCart,
                                      Tag, User)
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 
 class Base64ImageField(serializers.ImageField):

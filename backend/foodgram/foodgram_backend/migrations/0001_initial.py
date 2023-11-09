@@ -3,10 +3,9 @@
 import django.contrib.auth.models
 import django.db.models.deletion
 import django.utils.timezone
+import foodgram_backend.validators
 from django.conf import settings
 from django.db import migrations, models
-
-import foodgram_backend.validators
 
 
 class Migration(migrations.Migration):

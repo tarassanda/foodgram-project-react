@@ -5,6 +5,9 @@ from django.db.models import Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from foodgram_backend.models import (FavoriteRecipe, Follow, Ingredient,
+                                     IngredientAmount, Recipe, ShoppingCart,
+                                     Tag, User)
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import (IsAuthenticated,
@@ -12,10 +15,6 @@ from rest_framework.permissions import (IsAuthenticated,
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from foodgram_backend.models import (FavoriteRecipe, Follow, Ingredient,
-                                     IngredientAmount, Recipe, ShoppingCart,
-                                     Tag, User)
 
 from .filters import IngredientFilter, RecipeFilter
 from .paginators import PageLimitPagination
