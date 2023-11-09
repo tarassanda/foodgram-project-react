@@ -3,7 +3,8 @@ import csv
 from django.core.management.base import BaseCommand
 from foodgram_backend.models import Ingredient
 
-# docker compose exec backend python manage.py ingredient_import data/ingredients.csv
+# docker compose exec backend python manage.py  \
+# ingredient_import data/ingredients.csv
 
 
 class Command(BaseCommand):
