@@ -1,9 +1,9 @@
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MinValueValidator
 from django.db import models
 
-from .validators import validate_username, validate_year
+from .validators import validate_username
 
 
 class User(AbstractUser):
@@ -90,7 +90,9 @@ class Recipe(models.Model):
         help_text="Загрузить изображение",
     )
     cooking_time = models.PositiveSmallIntegerField(
-        verbose_name='Время приготовления (минут)')
+        verbose_name='Время приготовления (минут)',
+        validators=[MinValueValidator(
+            limit_value=1, message='Невозможно приготовить за 0 минут!'),])
 
     def __str__(self):
         return self.name
@@ -101,7 +103,9 @@ class IngredientAmount(models.Model):
         Ingredient,
         on_delete=models.CASCADE,
         verbose_name='Ингредиент')
-    amount = models.PositiveIntegerField()
+    amount = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(
+            limit_value=1, message='Количество должно быть больше 0'),])
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,

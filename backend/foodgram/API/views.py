@@ -1,36 +1,30 @@
 from datetime import datetime
+from urllib.parse import quote
 
 from django.db.models import Sum
-from django.contrib.auth.tokens import default_token_generator
-from django.contrib.auth import authenticate
-from django.db.models import Avg
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from urllib.parse import quote
-from rest_framework import mixins, permissions, viewsets, status
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
-from rest_framework.filters import SearchFilter
-from rest_framework.generics import get_object_or_404
+from rest_framework.permissions import (IsAuthenticated,
+                                        IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.tokens import AccessToken
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from rest_framework.permissions import IsAuthenticated
 
-from foodgram_backend.models import (User, Tag, Recipe, Ingredient,
-                                     Follow, FavoriteRecipe, IngredientAmount,
-                                     ShoppingCart)
-from .serializers import (TagSerializer, RecipePostSerializer,
-                          UserGetSerializer, UserCreateSerializer,
-                          IngredientSerializer, SetPasswordSerializer,
-                          RecipeSerializer, FollowSerializer,
-                          RecipeFollowSerializer)
+from foodgram_backend.models import (FavoriteRecipe, Follow, Ingredient,
+                                     IngredientAmount, Recipe, ShoppingCart,
+                                     Tag, User)
+
 from .filters import IngredientFilter, RecipeFilter
 from .paginators import PageLimitPagination
+from .permissions import IsRecipeAuthorOrReadOnly
+from .serializers import (FollowSerializer, IngredientSerializer,
+                          RecipeFollowSerializer, RecipePostSerializer,
+                          RecipeSerializer, SetPasswordSerializer,
+                          TagSerializer, UserCreateSerializer,
+                          UserGetSerializer)
 
 
 class UserViewSet(mixins.CreateModelMixin,
@@ -61,22 +55,22 @@ class UserViewSet(mixins.CreateModelMixin,
         permission_classes=[IsAuthenticated],
         serializer_class=SetPasswordSerializer)
     def set_password(self, request):
-        serializer = self.get_serializer(data=request.data)
+        serializer = SetPasswordSerializer(
+            data=request.data,
+            context={'request': request})
         serializer.is_valid(raise_exception=True)
-
         user = self.request.user
         current_password = serializer.validated_data.get('current_password')
         new_password = serializer.validated_data.get('new_password')
 
         if current_password != user.password:
-            return Response({'message': f'{current_password} and {user.password}'},
+            return Response({'message': 'Invalid password data'},
                             status=status.HTTP_400_BAD_REQUEST)
 
         user.password = new_password
         user.save(update_fields=['password'])
 
-        return Response({'message': 'Password successfully changed.'},
-                        status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         methods=['POST', 'DELETE'],
@@ -106,8 +100,7 @@ class UserViewSet(mixins.CreateModelMixin,
                 follow_instance = Follow.objects.get(user=user,
                                                      following=author)
                 follow_instance.delete()
-                return Response({'message':
-                                 'Successfully unsubscribed from the user.'})
+                return Response(status=status.HTTP_204_NO_CONTENT)
             return Response({'message':
                              'Not subscribed to the user.'},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -194,7 +187,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilter
     pagination_class = PageLimitPagination
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsRecipeAuthorOrReadOnly, IsAuthenticatedOrReadOnly]
 
     def get_serializer_class(self):
         if self.request.method == 'GET':
@@ -208,10 +201,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
         methods=['POST', 'DELETE'],
         detail=True,
         queryset=FavoriteRecipe.objects.all(),
-        permission_classes=[permissions.IsAuthenticated])
+        permission_classes=[IsAuthenticated,])
     def favorite(self, request, pk=None):
         user = self.request.user
-        recipe = get_object_or_404(Recipe, id=pk)
+
+        if Recipe.objects.filter(id=pk).exists():
+            recipe = Recipe.objects.get(id=pk)
+        elif request.method == 'POST':
+            return Response({'message': 'Recipe does not exists!'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'message': 'Recipe does not exists!'},
+                            status=status.HTTP_404_NOT_FOUND)
 
         if request.method == 'POST':
             serializer = RecipeFollowSerializer(recipe)
@@ -230,8 +231,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 follow_instance = FavoriteRecipe.objects.get(user=user,
                                                              recipe=recipe)
                 follow_instance.delete()
-                return Response({'message':
-                                 'Successfully deleted recipe from favorite.'})
+                return Response(status=status.HTTP_204_NO_CONTENT)
             return Response({'message':
                              'Recipe not in favorite.'},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -252,12 +252,19 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if ShoppingCart.objects.filter(user=user, recipe__id=pk).exists():
             return Response({'message': 'Recipe already added!'},
                             status=status.HTTP_400_BAD_REQUEST)
-        recipe = get_object_or_404(Recipe, id=pk)
+        if Recipe.objects.filter(id=pk).exists():
+            recipe = Recipe.objects.get(id=pk)
+        else:
+            return Response({'message': 'Recipe does not exists!'},
+                            status=status.HTTP_400_BAD_REQUEST)
         ShoppingCart.objects.create(user=user, recipe=recipe)
         serializer = RecipeFollowSerializer(recipe)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete_from(self, ShoppingCart, user, pk):
+        if not Recipe.objects.filter(id=pk).exists():
+            return Response({'message': 'Recipe does not exists!'},
+                            status=status.HTTP_404_NOT_FOUND)
         if ShoppingCart.objects.filter(user=user, recipe__id=pk).exists():
             ShoppingCart.objects.filter(user=user, recipe__id=pk).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -295,6 +302,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         filename = f'{user.username}_shopping_list.txt'
         quoted_filename = quote(filename)
         response = HttpResponse(shopping_list, content_type='text/plain')
-        response['Content-Disposition'] = f'attachment; filename="{quoted_filename}"'
+        response['Content-Disposition'] = \
+            f'attachment; filename="{quoted_filename}"'
 
         return response

@@ -17,15 +17,13 @@ services:
   backend:
     depends_on:
       - db
-    build: ../backend/foodgram/
+    image: tarassanda/foodgram_backend
     env_file: .env
     volumes:    
       - static:/app/collected_static/
       - media:/app/media/
   frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
+    image: tarassanda/foodgram_frontend
     volumes:
       - ../frontend/:/app/result_build/
   nginx:

@@ -1,13 +1,13 @@
 import base64
-import datetime as dt
 
-import webcolors
 from django.core.files.base import ContentFile
+from django.shortcuts import get_object_or_404
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
-from foodgram_backend.models import (User, Tag, Ingredient,
-                                     Recipe, IngredientAmount,
-                                     Follow, FavoriteRecipe, ShoppingCart)
+from foodgram_backend.models import (FavoriteRecipe, Follow, Ingredient,
+                                     IngredientAmount, Recipe, ShoppingCart,
+                                     Tag, User)
 
 
 class Base64ImageField(serializers.ImageField):
@@ -127,16 +127,53 @@ class IngredientRecipeSerializer(serializers.ModelSerializer):
 
 
 class RecipePostSerializer(serializers.ModelSerializer):
-    ingredients = IngredientAmountSerializer(many=True)
+    ingredients = IngredientAmountSerializer(many=True, required=True)
     tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(),
-                                              many=True)
-    image = Base64ImageField(required=False, allow_null=True)
+                                              many=True,
+                                              required=True)
+    image = Base64ImageField(required=True)
 
     class Meta:
         model = Recipe
         fields = ['ingredients', 'tags', 'image',
                   'name', 'text', 'cooking_time']
         read_only_fields = ['author']
+
+    def validate_ingredients(self, value):
+        ingredients = value
+        if not ingredients:
+            raise ValidationError({
+                'ingredients': 'Ингредиенты отсутствуют!'
+            })
+        ingredients_list = []
+        for ingredient in ingredients:
+            if not Ingredient.objects.filter(id=ingredient['id']).exists():
+                raise ValidationError({
+                    'ingredients': 'В списке несуществующие ингредиенты!'})
+            ingredient = get_object_or_404(Ingredient,
+                                           id=ingredient['id'])
+            if ingredient in ingredients_list:
+                raise ValidationError({
+                    'ingredients': 'В списке одинаковые ингредиенты!'
+                })
+            if int(ingredient['amount']) <= 0:
+                raise ValidationError({
+                    'amount': 'Количество должно быть больше 0!'
+                })
+            ingredients_list.append(ingredient)
+        return value
+
+    def validate_tags(self, value):
+        tags = value
+        if not tags:
+            raise ValidationError({'tags': 'Нужно выбрать хотя бы один тег!'})
+        tags_list = []
+        for tag in tags:
+            if tag in tags_list:
+                raise ValidationError({'tags':
+                                       'Теги должны быть уникальными!'})
+            tags_list.append(tag)
+        return value
 
     def create(self, validated_data):
         ingredients = validated_data.pop('ingredients')
@@ -159,9 +196,12 @@ class RecipePostSerializer(serializers.ModelSerializer):
                     ingredient_id=ingredient_to_save.get('id'),
                     amount=ingredient_to_save.get('amount'),
                     recipe=recipe,).save()
+        else:
+            raise ValidationError({'ingredients': 'Нет поля ингредиентов!'})
         if 'tags' in validated_data:
-            recipe.tags.set(
-                validated_data.pop('tags'))
+            recipe.tags.set(validated_data.pop('tags'))
+        else:
+            raise ValidationError({'tags': 'Нет поля тегов!'})
         return super().update(
             recipe, validated_data)
 
