@@ -14,8 +14,6 @@ router_v1.register('recipes', RecipeViewSet, basename='tags')
 auth_urls = [
     path('token/login/', TokenLoginViewSet.as_view(), name='login'),
     path('token/logout/', TokenLogoutViewSet.as_view(), name='logout'),
-
-
 ]
 
 urlpatterns = [
