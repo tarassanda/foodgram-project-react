@@ -145,17 +145,17 @@ class RecipePostSerializer(serializers.ModelSerializer):
                 'ingredients': 'Ингредиенты отсутствуют!'
             })
         ingredients_list = []
-        for ingredient in ingredients:
-            if not Ingredient.objects.filter(id=ingredient['id']).exists():
+        for instance in ingredients:
+            if not Ingredient.objects.filter(id=instance['id']).exists():
                 raise ValidationError({
                     'ingredients': 'В списке несуществующие ингредиенты!'})
             ingredient = get_object_or_404(Ingredient,
-                                           id=ingredient['id'])
+                                           id=instance['id'])
             if ingredient in ingredients_list:
                 raise ValidationError({
                     'ingredients': 'В списке одинаковые ингредиенты!'
                 })
-            if int(ingredient['amount']) <= 0:
+            if int(instance['amount']) <= 0:
                 raise ValidationError({
                     'amount': 'Количество должно быть больше 0!'
                 })
