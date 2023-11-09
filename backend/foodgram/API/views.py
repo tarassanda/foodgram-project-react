@@ -298,7 +298,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
             for ingredient in ingredients
         ])
         shopping_list += f'\n\nFoodgram ({today:%Y})'
-
         filename = f'{user.username}_shopping_list.txt'
         quoted_filename = quote(filename)
         response = HttpResponse(shopping_list, content_type='text/plain')
