@@ -91,7 +91,7 @@ class Recipe(models.Model):
     cooking_time = models.PositiveSmallIntegerField(
         verbose_name='Время приготовления (минут)',
         validators=[MinValueValidator(
-            limit_value=1, message='Невозможно приготовить за 0 минут!'),])
+            limit_value=1, message='Невозможно приготовить за 0 минут!'), ])
 
     def __str__(self):
         return self.name
@@ -104,7 +104,7 @@ class IngredientAmount(models.Model):
         verbose_name='Ингредиент')
     amount = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(
-            limit_value=1, message='Количество должно быть больше 0'),])
+            limit_value=1, message='Количество должно быть больше 0'), ])
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,

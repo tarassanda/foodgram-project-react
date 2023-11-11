@@ -105,7 +105,7 @@ class UserViewSet(mixins.CreateModelMixin,
                             status=status.HTTP_400_BAD_REQUEST)
 
     @action(
-        methods=['GET',],
+        methods=['GET'],
         detail=False,
         permission_classes=[IsAuthenticated],)
     def subscriptions(self, request):
@@ -200,7 +200,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         methods=['POST', 'DELETE'],
         detail=True,
         queryset=FavoriteRecipe.objects.all(),
-        permission_classes=[IsAuthenticated,])
+        permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):
         user = self.request.user
 

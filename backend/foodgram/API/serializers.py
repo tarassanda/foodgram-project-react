@@ -37,7 +37,7 @@ class UserCreateResponseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['email', 'id', 'username', 'first_name', 'last_name',]
+        fields = ['email', 'id', 'username', 'first_name', 'last_name']
 
 
 class UserGetSerializer(serializers.ModelSerializer):
@@ -242,4 +242,4 @@ class RecipeFollowSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Recipe
-        fields = ['id', 'name', 'image', 'cooking_time',]
+        fields = ['id', 'name', 'image', 'cooking_time']
