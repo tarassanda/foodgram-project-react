@@ -1,5 +1,6 @@
+from colorfield.fields import ColorField
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from .validators import validate_username
@@ -19,17 +20,10 @@ class User(AbstractUser):
     first_name = models.CharField(
         'Имя',
         max_length=150,
-        blank=False
     )
     last_name = models.CharField(
         'Фамилия',
         max_length=150,
-        blank=False
-    )
-    password = models.CharField(
-        'Пароль',
-        max_length=150,
-        blank=False
     )
 
     class Meta:
@@ -42,8 +36,8 @@ class User(AbstractUser):
 class Tag(models.Model):
     """Модель для Tags"""
     name = models.CharField(max_length=200, verbose_name='Тег')
-    color = models.CharField(max_length=7, null=False, verbose_name='Цвет')
-    slug = models.SlugField(max_length=200, null=False, unique=True)
+    color = ColorField(format='hexa', verbose_name='Цвет')
+    slug = models.SlugField(max_length=200, unique=True)
 
     def __str__(self):
         return self.name
@@ -52,7 +46,13 @@ class Tag(models.Model):
 class Ingredient(models.Model):
     """Модель для Ingredients"""
     name = models.CharField(max_length=200, verbose_name='Ингредиент')
-    measurement_unit = models.CharField(max_length=200, null=False)
+    measurement_unit = models.CharField(max_length=200)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['name', 'measurement_unit'],
+                                    name='unique_name_and_measurement')
+        ]
 
     def __str__(self):
         return self.name
@@ -85,7 +85,7 @@ class Recipe(models.Model):
     )
     image = models.ImageField(
         verbose_name='Картинка',
-        upload_to='foodgram_backend/',
+        upload_to='recipes/',
         help_text="Загрузить изображение",
     )
     cooking_time = models.PositiveSmallIntegerField(
@@ -104,11 +104,20 @@ class IngredientAmount(models.Model):
         verbose_name='Ингредиент')
     amount = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(
-            limit_value=1, message='Количество должно быть больше 0'), ])
+            limit_value=1, message='Количество должно быть больше 0'),
+            MaxValueValidator(
+            limit_value=3000, message='Количество должно быть не больше 3000'),
+        ])
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
         verbose_name='Рецепт')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['ingredient', 'recipe'],
+                                    name='unique_ingredient_in_recipe')
+        ]
 
 
 class FavoriteRecipe(models.Model):
@@ -124,6 +133,12 @@ class FavoriteRecipe(models.Model):
         related_name='favorites',
         verbose_name='Рецепт'
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'recipe'],
+                                    name='unique_favorite_recipe')
+        ]
 
 
 class Follow(models.Model):
@@ -166,3 +181,9 @@ class ShoppingCart(models.Model):
         related_name='shopping_cart',
         verbose_name='Рецепт',
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'recipe'],
+                                    name='unique_shopping_cart')
+        ]

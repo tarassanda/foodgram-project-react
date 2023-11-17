@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
 
 from .models import (FavoriteRecipe, Follow, Ingredient, IngredientAmount,
                      Recipe, ShoppingCart, Tag, User)
@@ -25,7 +26,7 @@ class IngredientAdmin(admin.ModelAdmin):
 
 
 @admin.register(User)
-class UserAdmin(admin.ModelAdmin):
+class UserAdmin(UserAdmin):
     pass
 
 

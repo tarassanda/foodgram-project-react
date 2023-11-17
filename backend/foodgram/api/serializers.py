@@ -1,12 +1,13 @@
 import base64
 
+from django.contrib.auth import password_validation as validators
 from django.core.files.base import ContentFile
-from django.shortcuts import get_object_or_404
-from foodgram_backend.models import (FavoriteRecipe, Follow, Ingredient,
-                                     IngredientAmount, Recipe, ShoppingCart,
-                                     Tag, User)
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from rest_framework.generics import get_object_or_404
+
+from recipes.models import (FavoriteRecipe, Follow, Ingredient,
+                            IngredientAmount, Recipe, ShoppingCart, Tag, User)
 
 
 class Base64ImageField(serializers.ImageField):
@@ -26,6 +27,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
         model = User
         fields = ['email', 'username', 'first_name',
                   'last_name', 'password']
+
+    def validate_password(self, password):
+        validators.validate_password(password)
+        return password
 
     def to_representation(self, instance):
         request = self.context.get('request')
@@ -52,7 +57,7 @@ class UserGetSerializer(serializers.ModelSerializer):
         try:
             user = self.context.get('request').user
         except AttributeError:
-            user = obj
+            return False
         if user.is_anonymous:
             return False
         return Follow.objects.filter(user=user, following=obj).exists()
@@ -62,7 +67,7 @@ class FollowSerializer(UserGetSerializer):
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.SerializerMethodField()
 
-    class Meta((UserGetSerializer.Meta)):
+    class Meta(UserGetSerializer.Meta):
         fields = UserGetSerializer.Meta.fields + [
             'recipes', 'recipes_count']
 

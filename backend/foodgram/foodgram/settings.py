@@ -14,7 +14,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
-AUTH_USER_MODEL = 'foodgram_backend.User'
+AUTH_USER_MODEL = 'recipes.User'
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
@@ -47,10 +47,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
-    'foodgram_backend',
+    'recipes',
     'rest_framework',
+    'djoser',
     'django_filters',
-    'API',
+    'api',
+    'colorfield',
 ]
 
 MIDDLEWARE = [

@@ -1,6 +1,7 @@
 import django_filters
 from django_filters.rest_framework import FilterSet, filters
-from foodgram_backend.models import Ingredient, Recipe, Tag
+
+from recipes.models import Ingredient, Recipe, Tag
 
 
 class IngredientFilter(FilterSet):
@@ -18,25 +19,21 @@ class RecipeFilter(FilterSet):
         to_field_name='slug',
         queryset=Tag.objects.all(),
     )
-    is_favorited = filters.BooleanFilter(field_name='is_favorited',
-                                         method='favorited',)
-    is_in_shopping_cart = filters.BooleanFilter(
-        field_name='is_in_shopping_cart', method='shopping_cart')
+    is_favorited = filters.BooleanFilter(method='favorited')
+    is_in_shopping_cart = filters.BooleanFilter(method='shopping_cart')
 
     def favorited(self, queryset, name, value):
-        user = self.request.user
-        if user.is_anonymous:
+        if self.request.user.is_anonymous:
             return queryset
-        if (value == 1) and name == 'is_favorited':
-            return queryset.filter(favorites__user=user)
+        if value:
+            return queryset.filter(favorites__user=self.request.user)
         return queryset
 
     def shopping_cart(self, queryset, name, value):
-        user = self.request.user
-        if user.is_anonymous:
+        if self.request.user.is_anonymous:
             return queryset
-        if (value == 1) and name == 'is_in_shopping_cart':
-            return queryset.filter(shopping_cart__user=user)
+        if value:
+            return queryset.filter(shopping_cart__user=self.request.user)
         return queryset
 
     class Meta:

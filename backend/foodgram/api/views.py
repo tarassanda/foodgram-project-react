@@ -1,20 +1,21 @@
 from datetime import datetime
 from urllib.parse import quote
 
+from django.contrib.auth.hashers import make_password
 from django.db.models import Sum
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from foodgram_backend.models import (FavoriteRecipe, Follow, Ingredient,
-                                     IngredientAmount, Recipe, ShoppingCart,
-                                     Tag, User)
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import (IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from recipes.models import (FavoriteRecipe, Follow, Ingredient,
+                            IngredientAmount, Recipe, ShoppingCart, Tag, User)
 
 from .filters import IngredientFilter, RecipeFilter
 from .paginators import PageLimitPagination
@@ -37,6 +38,16 @@ class UserViewSet(mixins.CreateModelMixin,
         if self.request.method == 'GET':
             return UserGetSerializer
         return UserCreateSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        validated_data['password'] = make_password(validated_data['password'])
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED,
+                        headers=headers)
 
     @action(
         methods=['GET'],
@@ -62,14 +73,13 @@ class UserViewSet(mixins.CreateModelMixin,
         current_password = serializer.validated_data.get('current_password')
         new_password = serializer.validated_data.get('new_password')
 
-        if current_password != user.password:
-            return Response({'message': 'Invalid password data'},
+        if user.check_password(current_password):
+            user.set_password(new_password)
+            user.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({'detail': 'Invalid password data'},
                             status=status.HTTP_400_BAD_REQUEST)
-
-        user.password = new_password
-        user.save(update_fields=['password'])
-
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         methods=['POST', 'DELETE'],
@@ -93,13 +103,10 @@ class UserViewSet(mixins.CreateModelMixin,
                 {'message': 'Unable to subscribe to the user.'},
                 status=status.HTTP_400_BAD_REQUEST)
 
-        if request.method == 'DELETE':
-            if Follow.objects.filter(user=user,
-                                     following=author).exists():
-                follow_instance = Follow.objects.get(user=user,
-                                                     following=author)
-                follow_instance.delete()
-                return Response(status=status.HTTP_204_NO_CONTENT)
+        try:
+            Follow.objects.filter(user=user, following=author).first().delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception:
             return Response({'message':
                              'Not subscribed to the user.'},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -129,10 +136,8 @@ class TokenLoginViewSet(APIView):
                             status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user = User.objects.get(email=email, password=password)
+            user = User.objects.filter(email=email).first()
         except User.DoesNotExist:
-            user = None
-        except User.MultipleObjectsReturned:
             user = None
 
         if user is None:
@@ -204,12 +209,13 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def favorite(self, request, pk=None):
         user = self.request.user
 
-        if Recipe.objects.filter(id=pk).exists():
-            recipe = Recipe.objects.get(id=pk)
-        elif request.method == 'POST':
+        recipe = Recipe.objects.filter(id=pk).first()
+
+        if recipe is None and (request.method == 'POST'):
             return Response({'message': 'Recipe does not exists!'},
                             status=status.HTTP_400_BAD_REQUEST)
-        else:
+
+        if recipe is None and (request.method == 'DELETE'):
             return Response({'message': 'Recipe does not exists!'},
                             status=status.HTTP_404_NOT_FOUND)
 
@@ -225,15 +231,15 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST)
 
         if request.method == 'DELETE':
-            if FavoriteRecipe.objects.filter(user=user,
-                                             recipe=recipe).exists():
-                follow_instance = FavoriteRecipe.objects.get(user=user,
-                                                             recipe=recipe)
+            follow_instance = FavoriteRecipe.objects.filter(
+                user=user, recipe=recipe).first()
+            try:
                 follow_instance.delete()
                 return Response(status=status.HTTP_204_NO_CONTENT)
-            return Response({'message':
-                             'Recipe not in favorite.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            except Exception:
+                return Response({'message':
+                                'Recipe not in favorite.'},
+                                status=status.HTTP_400_BAD_REQUEST)
 
     @action(
         detail=True,
@@ -300,7 +306,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         filename = f'{user.username}_shopping_list.txt'
         quoted_filename = quote(filename)
         response = HttpResponse(shopping_list, content_type='text/plain')
-        response['Content-Disposition'] = \
-            f'attachment; filename="{quoted_filename}"'
+        response['Content-Disposition'] = (
+            f'attachment; filename="{quoted_filename}"')
 
         return response
