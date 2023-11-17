@@ -2,12 +2,11 @@ import base64
 
 from django.contrib.auth import password_validation as validators
 from django.core.files.base import ContentFile
+from recipes.models import (FavoriteRecipe, Follow, Ingredient,
+                            IngredientAmount, Recipe, ShoppingCart, Tag, User)
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import get_object_or_404
-
-from recipes.models import (FavoriteRecipe, Follow, Ingredient,
-                            IngredientAmount, Recipe, ShoppingCart, Tag, User)
 
 
 class Base64ImageField(serializers.ImageField):
