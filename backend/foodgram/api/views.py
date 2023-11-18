@@ -5,8 +5,6 @@ from django.contrib.auth.hashers import make_password
 from django.db.models import Sum
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
-from recipes.models import (FavoriteRecipe, Follow, Ingredient,
-                            IngredientAmount, Recipe, ShoppingCart, Tag, User)
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
@@ -16,6 +14,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from recipes.models import (FavoriteRecipe, Follow, Ingredient,
+                            IngredientAmount, Recipe, ShoppingCart, Tag, User)
 from .filters import IngredientFilter, RecipeFilter
 from .paginators import PageLimitPagination
 from .permissions import IsRecipeAuthorOrReadOnly
@@ -134,10 +134,7 @@ class TokenLoginViewSet(APIView):
             return Response({'error': 'Email or password were not provided'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            user = User.objects.filter(email=email).first()
-        except User.DoesNotExist:
-            user = None
+        user = User.objects.filter(email=email).first()
 
         if user is None:
             return Response({'error': 'Invalid access data'},
@@ -210,13 +207,13 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         recipe = Recipe.objects.filter(id=pk).first()
 
-        if recipe is None and (request.method == 'POST'):
-            return Response({'message': 'Recipe does not exists!'},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        if recipe is None and (request.method == 'DELETE'):
-            return Response({'message': 'Recipe does not exists!'},
-                            status=status.HTTP_404_NOT_FOUND)
+        if recipe is None:
+            if request.method == 'POST':
+                return Response({'message': 'Recipe does not exists!'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({'message': 'Recipe does not exists!'},
+                                status=status.HTTP_404_NOT_FOUND)
 
         if request.method == 'POST':
             serializer = RecipeFollowSerializer(recipe)
@@ -256,9 +253,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if ShoppingCart.objects.filter(user=user, recipe__id=pk).exists():
             return Response({'message': 'Recipe already added!'},
                             status=status.HTTP_400_BAD_REQUEST)
-        if Recipe.objects.filter(id=pk).exists():
-            recipe = Recipe.objects.get(id=pk)
-        else:
+        recipe = Recipe.objects.filter(id=pk).first()
+        if recipe is None:
             return Response({'message': 'Recipe does not exists!'},
                             status=status.HTTP_400_BAD_REQUEST)
         ShoppingCart.objects.create(user=user, recipe=recipe)
